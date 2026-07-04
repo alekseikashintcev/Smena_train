@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="theme-color" content="#080f1e"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -1886,7 +1886,23 @@ function Timer({
   }, metro.active ? "🔇" : "🔊📳"), /*#__PURE__*/React.createElement("button", {
     className: `tmrb${run ? " run" : ""}`,
     onClick: toggle
-  }, done ? "↺" : run ? "⏸" : "▶"))));
+  }, done ? "↺" : run ? "⏸" : "▶"))), cpr && /*#__PURE__*/React.createElement("button", {
+    style: {
+      display: "block",
+      width: "100%",
+      marginTop: 10,
+      padding: "12px 14px",
+      border: "none",
+      borderTop: `1px solid ${C.border}`,
+      background: "transparent",
+      color: C.red,
+      fontFamily: "'Manrope',sans-serif",
+      fontWeight: 800,
+      fontSize: 13,
+      cursor: "pointer"
+    },
+    onClick: () => setShowCounter(true)
+  }, "🤲 Открыть счётчик компрессий на весь экран"));
 }
 
 /* ══════════════════ РЕАНИМАЦИЯ COUNTER ══════════ */
@@ -2017,6 +2033,31 @@ function loadSavedCases() {
 function persistSavedCases(list) {
   try {
     localStorage.setItem(CASES_LS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+/* ══════════════ ACTIVE CASE AUTOSAVE (localStorage) ══════════════ */
+/* Keeps the in-progress case (screen, log, confirmed actions) alive across
+   accidental reloads / crashes / backgrounding — critical during a real emergency. */
+const ACTIVE_CASE_LS_KEY = "smena_active_case_v1";
+function loadActiveCase() {
+  try {
+    const raw = localStorage.getItem(ACTIVE_CASE_LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.s ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+function persistActiveCase(data) {
+  try {
+    localStorage.setItem(ACTIVE_CASE_LS_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
+function clearActiveCase() {
+  try {
+    localStorage.removeItem(ACTIVE_CASE_LS_KEY);
   } catch (e) {}
 }
 function downloadTextFile(filename, text) {
@@ -2471,6 +2512,12 @@ function App() {
   const [savedCases, setSavedCases] = useState(() => loadSavedCases());
   const [confirmedActions, setConfirmedActions] = useState({});
   const [toast, setToast] = useState(null);
+  // Unfinished case recovered from localStorage on load (survives reload/crash mid-emergency)
+  const [pendingResume, setPendingResume] = useState(() => {
+    const saved = loadActiveCase();
+    return (saved && saved.s && saved.s.caseStartedAt) ? saved : null;
+  });
+  const skipNextPersistRef = useRef(!!pendingResume);
   const saveCase = (name, text) => {
     setSavedCases(prev => {
       const next = [...prev, { id: Date.now() + '_' + Math.random().toString(36).slice(2, 8), name, text, savedAt: Date.now() }];
@@ -2513,6 +2560,35 @@ function App() {
     setConfirmedActions(prev => ({ ...prev, [key]: true }));
     addEvent("✅ Выполнено: " + text);
   };
+  const resumeCase = () => {
+    if (!pendingResume) return;
+    set(pendingResume.s);
+    setEventLog(pendingResume.eventLog || []);
+    setConfirmedActions(pendingResume.confirmedActions || {});
+    setPendingResume(null);
+  };
+  const discardResume = () => {
+    clearActiveCase();
+    setPendingResume(null);
+  };
+  // Autosave the live case on every change so a reload / crash / dead battery
+  // mid-emergency doesn't wipe the journal and timers. Skips the very first
+  // run so an unresolved "resume?" prompt isn't wiped before the user answers it.
+  useEffect(() => {
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
+    if (s.caseStartedAt) {
+      persistActiveCase({ s, eventLog, confirmedActions, savedAt: Date.now() });
+    } else {
+      clearActiveCase();
+    }
+  }, [s, eventLog, confirmedActions]);
+  // Once the user has moved past "welcome" a stale resume prompt no longer applies
+  useEffect(() => {
+    if (s.screen !== "welcome" && pendingResume) setPendingResume(null);
+  }, [s.screen]);
   const voice = useVoice();
   const wakeLock = useWakeLock();
   const flash = useFlashlight();
@@ -2657,7 +2733,41 @@ function App() {
     style: {
       textAlign: "center"
     }
+  }, pendingResume && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.orangeBg,
+      border: `2px solid ${C.orange}60`,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+      textAlign: "left"
+    }
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 800,
+      color: C.orange,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginBottom: 8
+    }
+  }, "🔄 Незавершённый случай"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.textSec,
+      lineHeight: 1.5,
+      marginBottom: 12
+    }
+  }, `${patientTypeLabel(pendingResume.s.patientType)} · начат ${fmtShortDateTime(pendingResume.s.caseStartedAt)} · действий в журнале: ${(pendingResume.eventLog || []).length}`), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-red",
+    style: {
+      marginBottom: 8
+    },
+    onClick: resumeCase
+  }, "▶️ Продолжить с того места"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-sec",
+    onClick: discardResume
+  }, "Начать заново")), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 72,
       margin: "24px 0 12px"
