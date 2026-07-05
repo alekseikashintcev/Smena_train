@@ -670,8 +670,8 @@ const P = {
       }, {
         id: 3,
         icon: "💨",
-        title: "Открыть ДП → 2 спасательных вдоха",
-        text: "Запрокинуть голову + поднять подбородок.\nДать 2 вдоха: грудь должна подниматься.\n\nМладенцы: охватить рот И нос.",
+        title: "Откройте дыхательные пути → 2 вдоха",
+        text: "Запрокиньте голову + поднимите подбородок — дыхательные пути открыты.\n\nРебёнок старше 1 года: зажмите нос, обхватите его рот своими губами — как взрослому.\nМладенец до 1 года: НЕ зажимайте нос — обхватите губами рот И нос одновременно, вдувайте мягко.\n\nВдувайте до видимого подъёма груди. Всего 2 вдоха.",
         hl: "r",
         anim: "breaths"
       }, {
@@ -791,7 +791,7 @@ const P = {
         id: 4,
         icon: "💨",
         title: "Дыхательные пути",
-        text: "У беременных трудные дыхательные пути чаще!\nПоддерживайте проходимость ДП до прибытия бригады."
+        text: "У беременных трудные дыхательные пути чаще!\nПоддерживайте дыхательные пути открытыми до прибытия бригады."
       }, {
         id: 5,
         icon: "⚡",
@@ -1133,6 +1133,7 @@ const P = {
   bradycardia: {
     id: "bradycardia",
     title: "Брадикардия с пульсом",
+    subtitle: "Замедленное сердцебиение",
     icon: "📉",
     color: C.yellow,
     severity: "urgent",
@@ -1191,6 +1192,7 @@ const P = {
   tachycardia: {
     id: "tachycardia",
     title: "Тахикардия с пульсом",
+    subtitle: "Учащённое сердцебиение",
     icon: "📈",
     color: C.orange,
     severity: "urgent",
@@ -1211,7 +1213,7 @@ const P = {
         id: 3,
         icon: "💨",
         title: "Проба Вальсальвы",
-        text: "При сознании и регулярном ритме:\nСильно потужьтесь 15–30 секунд.\nМожет прервать СВТ."
+        text: "При сознании и регулярном ритме:\nСильно потужьтесь 15–30 секунд.\nМожет прервать приступ учащённого сердцебиения."
       }, {
         id: 4,
         icon: "👁️",
@@ -1998,6 +2000,29 @@ function CprCounter({ onClose, metro }) {
 }
 
 /* ══════════════════ OFFLINE ANIMATIONS ═ */
+/* Body-outline diagrams for the three most "spatial" actions — where exactly
+   to place hands / AED pads / autoinjector — since an emoji can't show WHERE
+   on the body an action happens, only that it's happening. */
+const BODY_DIAGRAMS = {
+  cpr: /*#__PURE__*/React.createElement("svg", { viewBox: "0 0 120 130", width: 84, height: 91 },
+    /*#__PURE__*/React.createElement("path", { d: "M28,14 Q60,2 92,14 L98,110 Q60,126 22,110 Z", fill: "none", stroke: "#8a9cbf", strokeWidth: 2.5 }),
+    /*#__PURE__*/React.createElement("line", { x1: 34, y1: 26, x2: 86, y2: 26, stroke: "#8a9cbf", strokeWidth: 1.5, strokeDasharray: "3,3" }),
+    /*#__PURE__*/React.createElement("line", { x1: 60, y1: 26, x2: 60, y2: 105, stroke: "#4a5a78", strokeWidth: 1, strokeDasharray: "2,3" }),
+    /*#__PURE__*/React.createElement("circle", { cx: 60, cy: 78, r: 13, fill: "#ff3a30", fillOpacity: 0.28, stroke: "#ff3a30", strokeWidth: 2.5 }),
+    /*#__PURE__*/React.createElement("circle", { cx: 60, cy: 78, r: 4, fill: "#ff3a30" })
+  ),
+  aed: /*#__PURE__*/React.createElement("svg", { viewBox: "0 0 120 130", width: 84, height: 91 },
+    /*#__PURE__*/React.createElement("path", { d: "M28,14 Q60,2 92,14 L98,110 Q60,126 22,110 Z", fill: "none", stroke: "#8a9cbf", strokeWidth: 2.5 }),
+    /*#__PURE__*/React.createElement("line", { x1: 60, y1: 14, x2: 60, y2: 118, stroke: "#4a5a78", strokeWidth: 1, strokeDasharray: "2,3" }),
+    /*#__PURE__*/React.createElement("rect", { x: 30, y: 20, width: 26, height: 26, rx: 4, fill: "#ff9500", fillOpacity: 0.3, stroke: "#ff9500", strokeWidth: 2.5 }),
+    /*#__PURE__*/React.createElement("rect", { x: 66, y: 74, width: 28, height: 32, rx: 4, fill: "#ff9500", fillOpacity: 0.3, stroke: "#ff9500", strokeWidth: 2.5, transform: "rotate(20 80 90)" })
+  ),
+  epi: /*#__PURE__*/React.createElement("svg", { viewBox: "0 0 90 130", width: 63, height: 91 },
+    /*#__PURE__*/React.createElement("path", { d: "M32,4 Q45,0 58,4 L64,112 Q45,126 26,112 Z", fill: "none", stroke: "#8a9cbf", strokeWidth: 2.5 }),
+    /*#__PURE__*/React.createElement("circle", { cx: 54, cy: 58, r: 12, fill: "#ff3a30", fillOpacity: 0.28, stroke: "#ff3a30", strokeWidth: 2.5 }),
+    /*#__PURE__*/React.createElement("circle", { cx: 54, cy: 58, r: 4, fill: "#ff3a30" })
+  )
+};
 function MiniAnimation({ type }) {
   const cfg = {
     cpr: { icons: ["🤲", "▭"], caption: "Компрессии: центр груди, 100–120/мин" },
@@ -2007,12 +2032,14 @@ function MiniAnimation({ type }) {
     stroke: { icons: ["🙂", "🙌", "🗣️", "⏱️"], caption: "FAST: лицо, руки, речь, время" },
     recovery: { icons: ["↻", "🧍"], caption: "После приступа: осторожно повернуть на бок" }
   }[type] || { icons: ["ℹ️"], caption: "Короткая подсказка" };
+  const diagram = BODY_DIAGRAMS[type];
   return /*#__PURE__*/React.createElement("div", {
     className: `anim anim-${type || "info"}`,
     "aria-label": cfg.caption
   }, /*#__PURE__*/React.createElement("div", {
-    className: "anim-icons"
-  }, cfg.icons.map((icon, i) => /*#__PURE__*/React.createElement("span", {
+    className: "anim-icons",
+    style: diagram ? { height: 100 } : undefined
+  }, diagram || cfg.icons.map((icon, i) => /*#__PURE__*/React.createElement("span", {
     key: i,
     className: "anim-symbol"
   }, icon))), /*#__PURE__*/React.createElement("div", {
@@ -3265,7 +3292,9 @@ function App() {
       className: "dico"
     }, proto.icon), /*#__PURE__*/React.createElement("div", {
       className: "dtit"
-    }, proto.title), /*#__PURE__*/React.createElement("div", {
+    }, proto.title), proto.subtitle && s.trainingLevel !== "medical" && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 14, fontWeight: 600, opacity: .8, marginBottom: 6 }
+    }, "(", proto.subtitle, ")"), /*#__PURE__*/React.createElement("div", {
       className: "dsub"
     }, s.patientType === "child" ? "👶 Ребёнок" : s.patientType === "pregnant" ? "🤰 Беременная" : s.patientType === "elderly" ? "👴 Пожилой" : "🧑 Взрослый", " · ", s.trainingLevel === "medical" ? "👨‍⚕️ Медперсонал" : "🙋 Первая помощь"), /*#__PURE__*/React.createElement("div", {
       className: "dbadge",
