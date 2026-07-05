@@ -2918,8 +2918,8 @@ function App() {
       alignItems: "center",
       justifyContent: "center",
       gap: 2,
-      background: C.red,
-      color: "#fff",
+      background: C.yellow,
+      color: "#000",
       border: "none",
       borderRadius: 12,
       padding: "10px 4px",
@@ -3598,10 +3598,91 @@ function App() {
   }
   return null;
 }
+
+/* ══════════════ ERROR BOUNDARY ══════════════ */
+/* Without this, any uncaught error anywhere in the tree unmounts the whole app
+   to a blank white screen — unacceptable mid-emergency. The fallback keeps
+   112 one tap away and offers a reload; the active case is autosaved to
+   localStorage already, so reloading can resume right where things left off. */
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    try {
+      console.error("Smena app crashed:", error, info && info.componentStack);
+    } catch (e) {}
+  }
+  render() {
+    if (this.state.hasError) {
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 28,
+          background: "#080f1e",
+          color: "#f0f4ff",
+          fontFamily: "'Manrope',sans-serif",
+          textAlign: "center"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 56, marginBottom: 14 }
+      }, "⚠️"), /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 20, fontWeight: 800, marginBottom: 10 }
+      }, "Приложение столкнулось с ошибкой"), /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 14, color: "#8a9cbf", marginBottom: 26, maxWidth: 320, lineHeight: 1.55 }
+      }, "Не теряйте время на ожидание — если ситуация экстренная, звоните 112 напрямую. Текущий случай сохранён и после перезапуска можно будет продолжить с того же места."), /*#__PURE__*/React.createElement("a", {
+        href: "tel:112",
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          maxWidth: 280,
+          padding: "16px 20px",
+          marginBottom: 12,
+          background: "#ff3a30",
+          color: "#fff",
+          borderRadius: 14,
+          fontWeight: 800,
+          fontSize: 18,
+          textDecoration: "none",
+          boxSizing: "border-box"
+        }
+      }, "📞 Позвонить 112"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => {
+          try { window.location.reload(); } catch (e) {}
+        },
+        style: {
+          display: "block",
+          width: "100%",
+          maxWidth: 280,
+          padding: "14px 20px",
+          background: "#111f3a",
+          color: "#f0f4ff",
+          border: "1px solid #1c3260",
+          borderRadius: 14,
+          fontWeight: 700,
+          fontSize: 15,
+          cursor: "pointer",
+          boxSizing: "border-box"
+        }
+      }, "🔄 Перезапустить приложение"));
+    }
+    return this.props.children;
+  }
+}
 const loadingEl = document.getElementById('loading');
 if (loadingEl) loadingEl.remove();
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(/*#__PURE__*/React.createElement(App, null));
+root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(App, null)));
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
