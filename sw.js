@@ -2,7 +2,7 @@
    Стратегия: сначала кэш (мгновенно + работает без сети),
    в фоне тихо обновляет кэш из сети, если она есть. */
 
-const CACHE_NAME = 'smena-cache-v2';
+const CACHE_NAME = 'smena-cache-v3';
 const APP_SHELL = ['./', './index.html'];
 
 self.addEventListener('install', event => {
