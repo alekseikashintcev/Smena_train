@@ -1984,6 +1984,10 @@ function useMetronome() {
     clearTimeout(timerRef.current);
     clearInterval(vibIntervalRef.current);
     if (navigator.vibrate) navigator.vibrate(0);
+    if (ctxRef.current) {
+      try { ctxRef.current.close(); } catch (e) {}
+      ctxRef.current = null;
+    }
   }, []);
 
   return { active, toggle, start, stop };
@@ -2003,7 +2007,16 @@ function useWakeLock() {
   }, []);
   const release = useCallback(() => {
     if (lockRef.current) {
-      lockRef.current.release();
+      try { lockRef.current.release(); } catch (e) {}
+      lockRef.current = null;
+    }
+  }, []);
+  // Страховка: если компонент размонтируется (например, ErrorBoundary поймал
+  // ошибку и снял дерево), а release() не был вызван явно из экрана — лок
+  // всё равно снимается и экран не остаётся принудительно включённым.
+  useEffect(() => () => {
+    if (lockRef.current) {
+      try { lockRef.current.release(); } catch (e) {}
       lockRef.current = null;
     }
   }, []);
@@ -2074,6 +2087,11 @@ function useVoice() {
     u.rate = 0.9;
     window.speechSynthesis.speak(u);
   }, [enabled]);
+  // Если приложение размонтируется посреди озвучки (например, после ошибки
+  // в ErrorBoundary), не даём голосу продолжать говорить "в пустоту".
+  useEffect(() => () => {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  }, []);
   return {
     enabled,
     setEnabled,
@@ -2203,6 +2221,10 @@ function Timer({
     onClick: () => setShowCounter(true)
   }, "🤲 Открыть счётчик компрессий на весь экран"));
 }
+// Мемоизация: Timer держит собственное состояние и зависит только от
+// (seconds, label, cpr, speak) — не нужно перерисовывать его при каждом
+// изменении родительского App (например, при добавлении записи в eventLog).
+Timer = React.memo(Timer);
 
 /* ══════════════════ РЕАНИМАЦИЯ COUNTER ══════════ */
 function CprCounter({ onClose, metro }) {
@@ -2343,6 +2365,8 @@ function MiniAnimation({ type }) {
     className: "anim-caption"
   }, cfg.caption));
 }
+// Мемоизация: чисто презентационный компонент, зависит только от `type`.
+MiniAnimation = React.memo(MiniAnimation);
 
 /* ══════════════════ SAVED CASES (localStorage) ═══════════ */
 const CASES_LS_KEY = "smena_saved_cases_v1";
@@ -2983,9 +3007,10 @@ function App() {
   // so a stressed user doesn't have to hunt for "what do I do now".
   const currentStepRef = useRef(null);
   useEffect(() => {
-    if (s.screen === "steps" && currentStepRef.current) {
+    const el = currentStepRef.current;
+    if (s.screen === "steps" && el && typeof el.scrollIntoView === "function") {
       try {
-        currentStepRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
       } catch (e) {}
     }
   }, [s.screen, s.protocolId, s.rhythmType, confirmedActions]);
@@ -3384,6 +3409,26 @@ function App() {
         className: "opt-lbl"
       }, o.l)))))));
     } else if (droneStep === "abcde") {
+      if (droneWho === "self") {
+        // Полный алгоритм ABCDE не подходит для самопомощи: нельзя проверить
+        // у себя пульс/дыхание и начать себе реанимацию (пункт C), и нет
+        // смысла опрашивать себя об имени и дате (пункт D). Вместо этого —
+        // самоосмотр, перенесённый сюда с прежнего шага 4.
+        const selfExamText = "Осмотрите себя, по возможности оголив тело: наличие крови, болезненные места, изменение формы тела/конечности, нарушение подвижности.";
+        droneBody = /*#__PURE__*/React.createElement(React.Fragment, null, droneHeader("Осмотрите себя", "Шаг 3 из 4"), /*#__PURE__*/React.createElement("div", {
+          className: "body"
+        }, /*#__PURE__*/React.createElement("div", {
+          className: "banner"
+        }, /*#__PURE__*/React.createElement("span", {
+          style: { fontSize: 20 }
+        }, "🔍"), /*#__PURE__*/React.createElement("div", {
+          className: "stxt"
+        }, selfExamText)), speakBtn(selfExamText), /*#__PURE__*/React.createElement("button", {
+          className: "btn btn-red",
+          style: { marginTop: 18 },
+          onClick: () => dgo("injury")
+        }, "Продолжить →")));
+      } else {
       const reanimProtocolId = droneWho === "other" && dronePatientType === "child" ? "cardiac_arrest_pediatric" : "cardiac_arrest";
       const letters = [{
         l: "A",
@@ -3435,6 +3480,7 @@ function App() {
         style: { marginTop: 18 },
         onClick: () => dgo("injury")
       }, "Продолжить →")));
+      }
     } else if (droneStep === "selfNote") {
       droneBody = /*#__PURE__*/React.createElement(React.Fragment, null, droneHeader("Ранение груди, тела, шеи, головы", "Помощь себе"), /*#__PURE__*/React.createElement("div", {
         className: "body"
@@ -3487,15 +3533,8 @@ function App() {
       }];
       droneBody = /*#__PURE__*/React.createElement(React.Fragment, null, droneHeader(droneWho === "self" ? "Помощь себе" : "Помощь пострадавшему", "Шаг 4 из 4 — что произошло?"), /*#__PURE__*/React.createElement("div", {
         className: "body"
-      }, droneWho === "self" && /*#__PURE__*/React.createElement("div", {
-        className: "banner"
-      }, /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: 20 }
-      }, "🔍"), /*#__PURE__*/React.createElement("div", {
-        className: "stxt"
-      }, "Осмотрите себя, по возможности оголив тело: наличие крови, болезненные места, изменение формы тела/конечности, нарушение подвижности.")), /*#__PURE__*/React.createElement("div", {
-        className: "opts",
-        style: { marginTop: droneWho === "self" ? 12 : 0 }
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "opts"
       }, items.map(o => /*#__PURE__*/React.createElement("button", {
         key: o.id,
         className: "opt",
@@ -4264,11 +4303,33 @@ root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/R
 // Регистрация service worker для офлайн-доступа при раздаче по HTTPS-адресу.
 // Требования service worker: секретный контекст (https:// или localhost).
 // Если условия не выполняются (например, страница открыта как локальный файл
-// или по обычному http://) — регистрация просто тихо не сработает,
+// или по обычному http://) — регистрация просто не сработает,
 // само приложение при этом продолжает работать как обычно.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js').catch(function () {});
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      // Отслеживаем установку новой версии SW. Сознательно НЕ делаем
+      // авто-перезагрузку страницы при обновлении: если проводник в этот
+      // момент находится посреди шагов оказания первой помощи, внезапный
+      // reload недопустим. Новая версия просто активируется сама при
+      // следующем обычном открытии приложения.
+      reg.addEventListener('updatefound', function () {
+        var nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', function () {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            if (window.console && console.info) {
+              console.info('Смена: доступна новая версия, применится при следующем запуске.');
+            }
+          }
+        });
+      });
+    }).catch(function (e) {
+      // Регистрация недоступна (file://, http://, старый браузер и т.п.) —
+      // для пользователя ничего не меняем (офлайн-режим без SW работает
+      // штатно), но логируем причину, чтобы её можно было увидеть при отладке.
+      if (window.console && console.warn) console.warn('SW registration failed:', e);
+    });
   });
 }
 
